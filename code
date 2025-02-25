@@ -1,0 +1,244 @@
+import tkinter
+
+from tkinter import *
+from tkinter import filedialog
+import numpy as np
+import os
+import keras
+import cv2
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from keras.models import Sequential
+from PIL import Image
+from keras.layers import Conv2D,Flatten,Dense,Dropout,BatchNormalization,MaxPooling2D
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.model_selection import train_test_split
+
+
+main = tkinter.Tk()
+main.title("Alzheimer's disease prediction using CNN")  # designing main screen
+main.geometry("1300x1200")
+global filename,path1,path2,path3,path4
+
+def upload():
+    global filename,path1,path2,path3,path4
+    filename = filedialog.askdirectory(
+                                  initialdir="./",
+                                  title='Please select a directory')
+    text.delete('1.0', END)
+    """# Import Dataset"""
+
+    path1 = []
+    path2 = []
+    path3 = []
+    path4 = []
+    for dirname, _, filenames in os.walk('Dataset/Non Demented'):
+        for filename in filenames:
+            path1.append(os.path.join(dirname, filename))
+
+    for dirname, _, filenames in os.walk('Dataset/Mild Dementia'):
+        for filename in filenames:
+            path2.append(os.path.join(dirname, filename))
+
+    for dirname, _, filenames in os.walk('Dataset/Moderate Dementia'):
+        for filename in filenames:
+            path3.append(os.path.join(dirname, filename))
+
+    for dirname, _, filenames in os.walk('Dataset/Very mild Dementia'):
+        for filename in filenames:
+            path4.append(os.path.join(dirname, filename))
+
+    text.insert(END, str(os.listdir("Dataset"))+ " OASIS MRI Dataset is loaded\n");
+    path1 = path1[0:100]
+    path2 = path2[0:100]
+    path3 = path3[0:100]
+    path4 = path4[0:100]
+
+def OneHotEncoding():
+    global data,result
+    encoder = OneHotEncoder()
+    encoder.fit([[0], [1], [2], [3]])
+
+    # 0 --> Non Demented
+    # 1 --> Mild Dementia
+    # 2 --> Moderate Dementia
+    # 3 --> Very Mild Dementia
+
+    data = []
+    result = []
+    for path in path1:
+        img = Image.open(path)
+        img = img.resize((128, 128))
+        img = np.array(img)
+        if (img.shape == (128, 128, 3)):
+            data.append(np.array(img))
+            result.append(encoder.transform([[0]]).toarray())
+
+    for path in path2:
+        img = Image.open(path)
+        img = img.resize((128, 128))
+        img = np.array(img)
+        if (img.shape == (128, 128, 3)):
+            data.append(np.array(img))
+            result.append(encoder.transform([[1]]).toarray())
+
+    for path in path3:
+        img = Image.open(path)
+        img = img.resize((128, 128))
+        img = np.array(img)
+        if (img.shape == (128, 128, 3)):
+            data.append(np.array(img))
+            result.append(encoder.transform([[2]]).toarray())
+
+    for path in path4:
+        img = Image.open(path)
+        img = img.resize((128, 128))
+        img = np.array(img)
+        if (img.shape == (128, 128, 3)):
+            data.append(np.array(img))
+            result.append(encoder.transform([[3]]).toarray())
+
+    data = np.array(data)
+    text.delete('1.0', END)
+    text.insert(END, " \n");
+    text.insert(END, "Dataset Shape");
+    text.insert(END, " \n");
+    text.insert(END, data.shape);
+    text.insert(END, " \n");
+
+
+    result = np.array(result)
+    result = result.reshape((400, 4))
+    text.insert(END, "Result Shape:");
+    text.insert(END, " \n");
+    text.insert(END, result.shape);
+    text.insert(END, " \n");
+
+def splittingTheData():
+    global x_train, x_test, y_train, y_test
+    x_train, x_test, y_train, y_test = train_test_split(data, result, test_size=0.15, shuffle=True, random_state=42)
+    text.delete('1.0', END)
+    text.insert(END, " \n")
+    text.insert(END, "Dataset Splitting Process is completed!");
+    text.insert(END, " \n")
+def CNNModel():
+    global model
+    model = Sequential()
+
+    model.add(Conv2D(32, kernel_size=(2, 2), input_shape=(128, 128, 3), padding='Same'))
+    model.add(Conv2D(32, kernel_size=(2, 2), activation='relu', padding='Same'))
+
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Dropout(0.25))
+
+    model.add(Conv2D(64, kernel_size=(2, 2), activation='relu', padding='Same'))
+    model.add(Conv2D(64, kernel_size=(2, 2), activation='relu', padding='Same'))
+
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+    model.add(Dropout(0.25))
+
+    model.add(Flatten())
+
+    model.add(Dense(512, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(4, activation='softmax'))
+    model.compile(loss='categorical_crossentropy', optimizer='Adamax', metrics=['accuracy'])
+    print(model.summary())
+    text.delete('1.0', END)
+    text.insert(END, " \n")
+    text.insert(END, "Train Dataset Shape:");
+    text.insert(END, " \n")
+    text.insert(END, y_train.shape);
+    text.insert(END, " \n")
+    text.insert(END, "Test Dataset Shape:");
+    text.insert(END, " \n")
+    text.insert(END, x_train.shape);
+    text.insert(END, " \n")
+
+
+
+    history = model.fit(x_train, y_train, epochs=10, batch_size=10, verbose=1, validation_data=(x_test, y_test))
+
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('Model Loss')
+    plt.xlabel('Loss')
+    plt.ylabel('Epoch')
+    plt.legend(['Test', 'Validation'], loc='upper right')
+    plt.show()
+    text.insert(END, "Convolution Neural Network (CNN) model is loaded successfully!");
+def names(number):
+    if number == 0:
+        return 'Non Demented'
+    elif number == 1:
+        return 'Mild Dementia'
+    elif number == 2:
+        return 'Moderate Dementia'
+    elif number == 3:
+        return 'Very Mild Dementia'
+    else:
+        return 'Error in Prediction'
+# 0 --> Non Demented
+# 1 --> Mild Dementia
+# 2 --> Moderate Dementia
+# 3 --> Very Mild Dementia
+def AccuracyandPrediction():
+    file_path = filedialog.askopenfilename(initialdir="test_MRI_images")
+    from matplotlib.pyplot import imshow
+    img = Image.open(file_path)
+    x = np.array(img.resize((128, 128)))
+    x = x.reshape(1, 128, 128, 3)
+    res = model.predict_on_batch(x)
+    classification = np.where(res == np.amax(res))[1][0]
+    imshow(img)
+    text.delete('1.0', END)
+    text.insert(END, " \n")
+    text.insert(END,str(res[0][classification] * 100) + '% Confidence This Is ' + names(classification))
+    text.insert(END, " \n")
+    img = cv2.imread(file_path)
+    img = cv2.resize(img, (600, 400))
+    cv2.putText(img, str(res[0][classification] * 100) + '% Confidence This Is ' + names(classification), (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                (255, 0, 0), 2)
+    cv2.imshow(str(res[0][classification] * 100) + '% Confidence This Is ' + names(classification), img)
+    cv2.waitKey(0)
+
+font = ('times',16, 'bold')
+title = Label(main, text="ALZHEIMER'S DISEASE PREDICTION USING CNN")
+title.config(bg='white', fg='purple')
+title.config(font=font)
+title.config(height=3, width=120)
+title.place(x=0, y=5)
+
+font1 = ('times', 14, 'bold')
+uploadButton = Button(main, text="Upload OASIS MRI dataset", command=upload)
+uploadButton.place(x=50, y=100)
+uploadButton.config(font=font1)
+
+readButton = Button(main, text="One Hot Encoding", command=OneHotEncoding)
+readButton.place(x=50, y=150)
+readButton.config(font=font1)
+
+cleanButton = Button(main, text="Splitting The Data", command=splittingTheData)
+cleanButton.place(x=260, y=150)
+cleanButton.config(font=font1)
+
+mlButton = Button(main, text="Generate CNN Model", command=CNNModel)
+mlButton.place(x=450, y=150)
+mlButton.config(font=font1)
+
+mlButton = Button(main, text="Accuracy and Prediction", command=AccuracyandPrediction)
+mlButton.place(x=710, y=150)
+mlButton.config(font=font1)
+
+font1 = ('times', 12, 'bold')
+text = Text(main, height=25, width=150)
+scroll = Scrollbar(text)
+text.configure(yscrollcommand=scroll.set)
+text.place(x=10, y=200)
+text.config(font=font1)
+
+main.config(bg='brown')
+main.mainloop()
